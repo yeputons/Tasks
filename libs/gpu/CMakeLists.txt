@@ -42,7 +42,7 @@ set(CUDA_SOURCES
         libgpu/cuda/utils.cpp
         )
 
-option(GPU_CUDA_SUPPORT "CUDA support utils." OFF)
+option(GPU_CUDA_SUPPORT "CUDA support." OFF)
 
 set (LIBRARIES
         libclew

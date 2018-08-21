@@ -23,11 +23,6 @@
 #define DUMP_KERNEL_BINARIES_TO_FILE ""
 #define OCL_VERBOSE_COMPILE_LOG false
 
-#ifndef NDEBUG
-#undef OCL_VERBOSE_COMPILE_LOG
-#define OCL_VERBOSE_COMPILE_LOG true
-#endif
-
 #ifdef _MSC_VER
 typedef unsigned long long uint64_t;
 #endif

@@ -9,11 +9,6 @@
 
 #define OCL_CPU_DEVICES_ENABLED true
 
-#ifndef NDEBUG
-#undef OCL_CPU_DEVICES_ENABLED
-#define OCL_CPU_DEVICES_ENABLED true
-#endif
-
 bool OpenCLEnum::Device::printInfo() const
 {
 	ocl::DeviceInfo device_info;

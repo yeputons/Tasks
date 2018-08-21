@@ -100,6 +100,24 @@ bool Device::printInfo() const
 	return false;
 }
 
+bool Device::supportsFreeMemoryQuery() const
+{
+#ifdef CUDA_SUPPORT
+	if (supports_cuda) {
+		return true;
+	} else
+#endif
+	if (supports_opencl) {
+		ocl::DeviceInfo device_info;
+		device_info.init(device_id_opencl);
+		if (device_info.hasExtension(CL_AMD_DEVICE_ATTRIBUTE_QUERY_EXT)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 unsigned long long Device::getFreeMemory() const
 {
 #ifdef CUDA_SUPPORT

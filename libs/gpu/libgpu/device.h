@@ -26,6 +26,7 @@ public:
 
 	bool				printInfo() const;
 
+	bool				supportsFreeMemoryQuery() const;
 	unsigned long long	getFreeMemory() const;
 
 	bool operator< (const Device &other) const

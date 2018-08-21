@@ -1,19 +1,37 @@
 #include "misc.h"
 
+#ifdef CUDA_SUPPORT
+#include <cuda_runtime_api.h>
+#endif
+
 void gpu::printDeviceInfo(gpu::Device &device)
 {
-	ocl::DeviceInfo info;
-	info.init(device.device_id_opencl);
-	if (info.device_type == CL_DEVICE_TYPE_GPU) {
-		std::cout << "GPU ";
-	} else if (info.device_type == CL_DEVICE_TYPE_CPU) {
-		std::cout << "CPU ";
-	} else {
-		throw std::runtime_error("Only CPU and GPU supported! But type=" + to_string(info.device_type) + " encountered!");
+#ifdef CUDA_SUPPORT
+	if (device.supports_cuda) {
+		int driverVersion = 239;
+		cudaDriverGetVersion(&driverVersion);
+		std::cout << "GPU. " << device.name << " (CUDA " << driverVersion << ").";
+	} else
+#endif
+	{
+		ocl::DeviceInfo info;
+		info.init(device.device_id_opencl);
+		if (info.device_type == CL_DEVICE_TYPE_GPU) {
+			std::cout << "GPU.";
+		} else if (info.device_type == CL_DEVICE_TYPE_CPU) {
+			std::cout << "CPU.";
+		} else {
+			throw std::runtime_error(
+					"Only CPU and GPU supported! But type=" + to_string(info.device_type) + " encountered!");
+		}
+		std::cout << " " << info.device_name << ".";
+		if (info.device_type == CL_DEVICE_TYPE_CPU) {
+			std::cout << " " << info.vendor_name << ".";
+		}
 	}
-	std::cout << info.device_name;
-	if (info.device_type == CL_DEVICE_TYPE_CPU) {
-		std::cout << " " << info.platform_version;
+
+	if (device.supportsFreeMemoryQuery()) {
+		std::cout << " Free memory: " << (device.getFreeMemory() >> 20) << "/" << (device.mem_size >> 20) << " Mb";
 	} else {
 		std::cout << " Total memory: " << (device.mem_size >> 20) << " Mb";
 	}
@@ -50,7 +68,7 @@ gpu::Device gpu::chooseGPUDevice(int argc, char **argv)
 			}
 		}
 		std::cout << "Using device #" << device_index << ": ";
-        gpu::printDeviceInfo(devices[device_index]);
+		gpu::printDeviceInfo(devices[device_index]);
 	}
 	return devices[device_index];
 }
