@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/GPGPUCourse2018/Task1AplusB.svg?branch=master)](https://travis-ci.com/GPGPUCourse2018/Task1AplusB)
+[![Build Status](https://travis-ci.com/GPGPUCourse2018/Tasks.svg?branch=task3)](https://travis-ci.com/GPGPUCourse2018/Tasks)
 
 Задание 3. Фрактал Мандельброта. Сумма чисел. Максимальный по сумме префикс.
 =========
