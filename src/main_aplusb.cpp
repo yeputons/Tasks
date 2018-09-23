@@ -4,7 +4,7 @@
 #include <libgpu/context.h>
 #include <libgpu/shared_device_buffer.h>
 
-// Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
+// Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:22
 #include "cl/aplusb_cl.h"
 
 #include <vector>
@@ -26,7 +26,7 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 int main(int argc, char **argv)
 {
-    // TODO это пример использования обертки для решения предыдущего задания A+B
+    // Это пример использования библиотеки для решения предыдущего задания A+B
 
     // chooseGPUDevice:
     // - Если не доступо ни одного устройства - кинет ошибку
@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    unsigned int n = 100*1000*1000;
+    unsigned int n = 50*1000*1000;
     std::vector<float> as(n, 0);
     std::vector<float> bs(n, 0);
     std::vector<float> cs(n, 0);

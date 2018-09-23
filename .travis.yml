@@ -15,3 +15,5 @@ script:
   - make -j4
   - ./aplusb
   - ./mandelbrot
+  - ./sum
+  - ./max_prefix_sum

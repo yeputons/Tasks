@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.1)
 
 add_subdirectory(libs)
 
-project(mandelbrot)
+project(task3)
 
 set(CMAKE_CXX_STANDARD 11)
 
@@ -27,3 +27,13 @@ target_link_libraries(aplusb libclew libgpu libutils)
 convertIntoHeader(src/cl/mandelbrot.cl src/cl/mandelbrot_cl.h mandelbrot_kernel)
 add_executable(mandelbrot src/main_mandelbrot.cpp src/cl/mandelbrot_cl.h)
 target_link_libraries(mandelbrot libclew libgpu libimages libutils)
+
+# Для вычисления суммы
+convertIntoHeader(src/cl/sum.cl src/cl/sum_cl.h sum_kernel)
+add_executable(sum src/main_sum.cpp src/cl/sum_cl.h)
+target_link_libraries(sum libclew libgpu libutils)
+
+# Для вычисления максимального по сумме префикса
+convertIntoHeader(src/cl/max_prefix_sum.cl src/cl/max_prefix_sum_cl.h max_prefix_sum_kernel)
+add_executable(max_prefix_sum src/main_max_prefix_sum.cpp src/cl/max_prefix_sum_cl.h)
+target_link_libraries(max_prefix_sum libclew libgpu libutils)
