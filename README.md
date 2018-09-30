@@ -3,3 +3,4 @@
 Задания:
 
  - [Ветка task3](https://github.com/GPGPUCourse2018/Tasks/tree/task3): Фрактал Мандельброта. Сумма чисел. Максимальный по сумме префикс.
+ - [Ветка task4](https://github.com/GPGPUCourse2018/Tasks/tree/task4): Транспонирование матрицы. Умножение матриц.
