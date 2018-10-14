@@ -14,3 +14,5 @@ script:
   - cmake -DCMAKE_BUILD_TYPE=RELWITHDEBINFO ..
   - make -j4
   - ./aplusb
+  - ./sort_bitonic
+  - ./sort_radix
