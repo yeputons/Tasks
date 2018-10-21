@@ -22,3 +22,7 @@ endif()
 convertIntoHeader(src/cl/aplusb.cl src/cl/aplusb_cl.h aplusb_kernel)
 add_executable(aplusb src/main_aplusb.cpp src/cl/aplusb_cl.h)
 target_link_libraries(aplusb libclew libgpu libutils)
+
+convertIntoHeader(src/cl/merge.cl src/cl/merge_cl.h merge_kernel)
+add_executable(merge src/main_merge.cpp src/cl/merge_cl.h)
+target_link_libraries(merge libclew libgpu libutils)
