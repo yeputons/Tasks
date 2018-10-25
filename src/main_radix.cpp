@@ -33,7 +33,7 @@ int main(int argc, char **argv)
     context.activate();
 
     int benchmarkingIters = 10;
-    unsigned int n = 50*1000*1000;
+    unsigned int n = 5*1000*1000+37;
     std::vector<unsigned int> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -52,13 +52,29 @@ int main(int argc, char **argv)
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n/1000/1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-/*
+
     gpu::gpu_mem_32u as_gpu;
     as_gpu.resizeN(n);
 
     {
-        ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix");
-        radix.compile();
+        ocl::Kernel radixInit(radix_kernel, radix_kernel_length, "radixInit");
+        ocl::Kernel radixSum(radix_kernel, radix_kernel_length, "radixSum");
+        ocl::Kernel radixShuffle(radix_kernel, radix_kernel_length, "radixShuffle");
+        radixInit.compile();
+        radixSum.compile();
+        radixShuffle.compile();
+
+        //#define DEBUG
+        #ifdef DEBUG
+        std::vector<unsigned int> prefsums0(n), prefsums1(n), as_next(n);
+        #endif
+
+        gpu::gpu_mem_32u prefsums0_gpu, prefsums1_gpu, prefsums0_next_gpu, prefsums1_next_gpu, as_next_gpu;
+        prefsums0_gpu.resizeN(n);
+        prefsums1_gpu.resizeN(n);
+        prefsums0_next_gpu.resizeN(n);
+        prefsums1_next_gpu.resizeN(n);
+        as_next_gpu.resizeN(n);
 
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
@@ -68,8 +84,48 @@ int main(int argc, char **argv)
 
             unsigned int workGroupSize = 128;
             unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-            radix.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                       as_gpu, n);
+            for (int bit = 0; bit < 32; bit++) {
+                radixInit.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                               as_gpu, prefsums0_gpu, prefsums1_gpu, n, bit);
+                for (int sumBlock = 1; sumBlock < n; sumBlock *= 2) {
+                    radixSum.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                                  prefsums0_gpu, prefsums1_gpu, prefsums0_next_gpu, prefsums1_next_gpu,
+                                  n, bit, sumBlock);
+                    prefsums0_gpu.swap(prefsums0_next_gpu);
+                    prefsums1_gpu.swap(prefsums1_next_gpu);
+                }
+                radixShuffle.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                                  as_gpu, as_next_gpu, prefsums0_gpu, prefsums1_gpu, n, bit);
+
+                #ifdef DEBUG
+                as_gpu.readN(as.data(), n);
+                as_next_gpu.readN(as_next.data(), n);
+                prefsums0_gpu.readN(prefsums0.data(), n);
+                prefsums1_gpu.readN(prefsums1.data(), n);
+                std::cout << "bits:";
+                for (int i = 0; i < n; i++) {
+                    std::cout << " " << !!(as[i] & (1 << bit));
+                }
+                std::cout << "\n";
+                std::cout << "prefsums0:";
+                for (int i = 0; i < n; i++) {
+                    std::cout << " " << prefsums0[i];
+                }
+                std::cout << "\n";
+                std::cout << "prefsums1:";
+                for (int i = 0; i < n; i++) {
+                    std::cout << " " << prefsums1[i];
+                }
+                std::cout << "\n";
+                std::cout << "new bits:";
+                for (int i = 0; i < n; i++) {
+                    std::cout << " " << !!(as_next[i] & (1 << bit));
+                }
+                std::cout << "\n";
+                return 0;
+                #endif
+                as_gpu.swap(as_next_gpu);
+            }
             t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
@@ -82,6 +138,6 @@ int main(int argc, char **argv)
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
+
     return 0;
 }
