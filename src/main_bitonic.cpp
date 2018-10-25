@@ -60,7 +60,9 @@ int main(int argc, char **argv)
 
     {
         ocl::Kernel bitonic(bitonic_kernel, bitonic_kernel_length, "bitonic");
+        ocl::Kernel bitonicLocal(bitonic_kernel, bitonic_kernel_length, "bitonicLocal");
         bitonic.compile();
+        bitonicLocal.compile();
 
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
@@ -71,6 +73,8 @@ int main(int argc, char **argv)
             unsigned int workGroupSize = 128;
             unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
             // TODO: Would be nice to enqueue these tasks.
+            bitonicLocal.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                              as_gpu, n);
             for (int sortedBlockSize = 1; sortedBlockSize < n; sortedBlockSize *= 2) {
                 bitonic.exec(gpu::WorkSize(workGroupSize, global_work_size),
                              as_gpu, n, sortedBlockSize, false);
