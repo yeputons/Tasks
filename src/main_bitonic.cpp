@@ -33,7 +33,9 @@ int main(int argc, char **argv)
     context.activate();
 
     int benchmarkingIters = 10;
-    unsigned int n = 50*1000*1000;
+    // We want to check that bound checks in kernel are correct,
+    // hence n should not be divisible by powers of two as much as possible.
+    unsigned int n = 5*1000*1000+37;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -52,7 +54,7 @@ int main(int argc, char **argv)
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n/1000/1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-/*
+
     gpu::gpu_mem_32f as_gpu;
     as_gpu.resizeN(n);
 
@@ -68,8 +70,15 @@ int main(int argc, char **argv)
 
             unsigned int workGroupSize = 128;
             unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-            bitonic.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                         as_gpu, n);
+            // TODO: Would be nice to enqueue these tasks.
+            for (int sortedBlockSize = 1; sortedBlockSize < n; sortedBlockSize *= 2) {
+                bitonic.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                             as_gpu, n, sortedBlockSize, false);
+                for (int alignBlock = sortedBlockSize / 2; alignBlock > 0; alignBlock /= 2) {
+                    bitonic.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                                 as_gpu, n, alignBlock, true);
+                }
+            }
             t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
@@ -82,6 +91,6 @@ int main(int argc, char **argv)
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
+
     return 0;
 }
