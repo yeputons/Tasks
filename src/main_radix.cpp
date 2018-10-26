@@ -64,17 +64,18 @@ int main(int argc, char **argv)
         radixSum.compile();
         radixShuffle.compile();
 
+        const unsigned int workGroupSize = 128;
+        const unsigned int bitsPerPass = 2;
+        const unsigned int prefsumsSize = n * (1 << bitsPerPass);
+        gpu::gpu_mem_32u prefsums_gpu, prefsums_next_gpu, as_next_gpu;
+        prefsums_gpu.resizeN(prefsumsSize);
+        prefsums_next_gpu.resizeN(prefsumsSize);
+        as_next_gpu.resizeN(n);
+
         //#define DEBUG
         #ifdef DEBUG
-        std::vector<unsigned int> prefsums0(n), prefsums1(n), as_next(n);
+        std::vector<unsigned int> prefsums(prefsumsSize), as_next(n);
         #endif
-
-        gpu::gpu_mem_32u prefsums0_gpu, prefsums1_gpu, prefsums0_next_gpu, prefsums1_next_gpu, as_next_gpu;
-        prefsums0_gpu.resizeN(n);
-        prefsums1_gpu.resizeN(n);
-        prefsums0_next_gpu.resizeN(n);
-        prefsums1_next_gpu.resizeN(n);
-        as_next_gpu.resizeN(n);
 
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
@@ -82,41 +83,35 @@ int main(int argc, char **argv)
 
             t.restart(); // Запускаем секундомер после прогрузки данных чтобы замерять время работы кернела, а не трансфер данных
 
-            unsigned int workGroupSize = 128;
-            unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-            for (int bit = 0; bit < 32; bit++) {
-                radixInit.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                               as_gpu, prefsums0_gpu, prefsums1_gpu, n, bit);
-                for (int sumBlock = 1; sumBlock < n; sumBlock *= 2) {
-                    radixSum.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                                  prefsums0_gpu, prefsums1_gpu, prefsums0_next_gpu, prefsums1_next_gpu,
-                                  n, bit, sumBlock);
-                    prefsums0_gpu.swap(prefsums0_next_gpu);
-                    prefsums1_gpu.swap(prefsums1_next_gpu);
+            const unsigned int global_n_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+            const unsigned int global_prefsums_work_size = (prefsumsSize + workGroupSize - 1) / workGroupSize * workGroupSize;
+            for (int bit = 0; bit < 32; bit += bitsPerPass) {
+                radixInit.exec(gpu::WorkSize(workGroupSize, global_n_work_size),
+                               as_gpu, prefsums_gpu, n, bit);
+                for (int sumBlock = 1; sumBlock < prefsumsSize; sumBlock *= 2) {
+                    radixSum.exec(gpu::WorkSize(workGroupSize, global_prefsums_work_size),
+                                  prefsums_gpu, prefsums_next_gpu, prefsumsSize, sumBlock);
+                    prefsums_gpu.swap(prefsums_next_gpu);
                 }
-                radixShuffle.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                                  as_gpu, as_next_gpu, prefsums0_gpu, prefsums1_gpu, n, bit);
+                radixShuffle.exec(gpu::WorkSize(workGroupSize, global_n_work_size),
+                                  as_gpu, as_next_gpu, prefsums_gpu, n, bit);
 
                 #ifdef DEBUG
                 as_gpu.readN(as.data(), n);
                 as_next_gpu.readN(as_next.data(), n);
-                prefsums0_gpu.readN(prefsums0.data(), n);
-                prefsums1_gpu.readN(prefsums1.data(), n);
-                std::cout << "bits:";
+                prefsums_gpu.readN(prefsums.data(), prefsumsSize);
+                std::cout << "vals:";
                 for (int i = 0; i < n; i++) {
-                    std::cout << " " << !!(as[i] & (1 << bit));
+                    std::cout << " " << ((as[i] >> bit) & ((1 << bitsPerPass) - 1));
                 }
                 std::cout << "\n";
-                std::cout << "prefsums0:";
-                for (int i = 0; i < n; i++) {
-                    std::cout << " " << prefsums0[i];
+                for (int val = 0; val < (1 << bitsPerPass); val++) {
+                    std::cout << "prefsums" << val << ":";
+                    for (int i = 0; i < n; i++) {
+                        std::cout << " " << prefsums[val * n + i];
+                    }
+                    std::cout << "\n";
                 }
-                std::cout << "\n";
-                std::cout << "prefsums1:";
-                for (int i = 0; i < n; i++) {
-                    std::cout << " " << prefsums1[i];
-                }
-                std::cout << "\n";
                 std::cout << "new bits:";
                 for (int i = 0; i < n; i++) {
                     std::cout << " " << !!(as_next[i] & (1 << bit));
