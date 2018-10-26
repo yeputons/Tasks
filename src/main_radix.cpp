@@ -8,6 +8,7 @@
 #include "cl/radix_cl.h"
 
 #include <assert.h>
+#include <algorithm>
 #include <vector>
 #include <iostream>
 #include <stdexcept>
@@ -68,11 +69,13 @@ int main(int argc, char **argv)
 
     {
         ocl::Kernel radixInit(radix_kernel, radix_kernel_length, "radixInit");
+        ocl::Kernel radixLocalFwd(radix_kernel, radix_kernel_length, "radixLocalFwd");
         ocl::Kernel radixFwd(radix_kernel, radix_kernel_length, "radixFwd");
         ocl::Kernel radixMid(radix_kernel, radix_kernel_length, "radixMid");
         ocl::Kernel radixBwd(radix_kernel, radix_kernel_length, "radixBwd");
         ocl::Kernel radixShuffle(radix_kernel, radix_kernel_length, "radixShuffle");
         radixInit.compile();
+        radixLocalFwd.compile();
         radixFwd.compile();
         radixMid.compile();
         radixBwd.compile();
@@ -80,7 +83,7 @@ int main(int argc, char **argv)
 
         const unsigned int workGroupSize = 128;
         const unsigned int bitsPerPass = 4;
-        const unsigned int prefsumsSize = ceil_pow_2(n * (1 << bitsPerPass));
+        const unsigned int prefsumsSize = ceil_pow_2(std::max(2 * workGroupSize, n * (1 << bitsPerPass)));
 
         gpu::gpu_mem_32u prefsums_gpu, as_next_gpu;
         prefsums_gpu.resizeN(prefsumsSize);
@@ -101,7 +104,12 @@ int main(int argc, char **argv)
             for (int bit = 0; bit < 32; bit += bitsPerPass) {
                 radixInit.exec(gpu::WorkSize(workGroupSize, global_n_work_size),
                                as_gpu, prefsums_gpu, n, bit);
-                int sumBlock = 1;
+                {
+                    const unsigned int global_prefsums_work_size = (prefsumsSize / 2 + workGroupSize - 1) / workGroupSize * workGroupSize;
+                    radixLocalFwd.exec(gpu::WorkSize(workGroupSize, global_prefsums_work_size),
+                                       prefsums_gpu, prefsumsSize);
+                }
+                int sumBlock = 2 * workGroupSize;
                 for (; sumBlock < prefsumsSize; sumBlock *= 2) {
                     const unsigned int global_prefsums_work_size = (prefsumsSize / (2 * sumBlock) + workGroupSize - 1) / workGroupSize * workGroupSize;
                     radixFwd.exec(gpu::WorkSize(workGroupSize, global_prefsums_work_size),

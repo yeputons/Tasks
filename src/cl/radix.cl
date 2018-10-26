@@ -1,5 +1,7 @@
+#define WORK_GROUP_SIZE 128
 #define BITS_PER_PASS 4
 #define BITS_MSK ((1 << BITS_PER_PASS) - 1)
+#define LSIZE (2 * WORK_GROUP_SIZE)
 
 __kernel void radixInit(__global unsigned int* as, __global int* prefsums, int n, int bit) {
     int i = get_global_id(0);
@@ -10,6 +12,27 @@ __kernel void radixInit(__global unsigned int* as, __global int* prefsums, int n
     }
     int val = (as[i] >> bit) & BITS_MSK;
     prefsums[n * val + i] = 1;
+}
+
+__kernel void radixLocalFwd(__global int* global_prefsums, int global_size) {
+    int local_i = get_local_id(0);
+    int global_i = 2 * (get_global_id(0) - local_i) + local_i;
+
+    __local int prefsums[LSIZE];
+    prefsums[local_i] = global_prefsums[global_i];
+    prefsums[local_i + WORK_GROUP_SIZE] = global_prefsums[global_i + WORK_GROUP_SIZE];
+
+    for (int sumBlock = 1; sumBlock < LSIZE; sumBlock *= 2) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+        int pos = 2 * sumBlock * (local_i + 1) - 1;
+        if (pos < LSIZE) {
+            prefsums[pos] += prefsums[pos - sumBlock];
+        }
+    }
+    barrier(CLK_GLOBAL_MEM_FENCE);
+
+    global_prefsums[global_i] = prefsums[local_i];
+    global_prefsums[global_i + WORK_GROUP_SIZE] = prefsums[local_i + WORK_GROUP_SIZE];
 }
 
 __kernel void radixFwd(__global int* prefsums, int size, int sumBlock) {
