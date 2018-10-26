@@ -7,6 +7,7 @@
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/radix_cl.h"
 
+#include <assert.h>
 #include <vector>
 #include <iostream>
 #include <stdexcept>
@@ -23,6 +24,15 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
+unsigned int ceil_pow_2(unsigned int n)
+{
+    unsigned int x = 1;
+    while (x < n) {
+        x *= 2;
+        assert(x);
+    }
+    return x;
+}
 
 int main(int argc, char **argv)
 {
@@ -33,7 +43,7 @@ int main(int argc, char **argv)
     context.activate();
 
     int benchmarkingIters = 10;
-    unsigned int n = 5*1000*1000+37;
+    unsigned int n = 1000*1000+37;
     std::vector<unsigned int> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -58,18 +68,22 @@ int main(int argc, char **argv)
 
     {
         ocl::Kernel radixInit(radix_kernel, radix_kernel_length, "radixInit");
-        ocl::Kernel radixSum(radix_kernel, radix_kernel_length, "radixSum");
+        ocl::Kernel radixFwd(radix_kernel, radix_kernel_length, "radixFwd");
+        ocl::Kernel radixMid(radix_kernel, radix_kernel_length, "radixMid");
+        ocl::Kernel radixBwd(radix_kernel, radix_kernel_length, "radixBwd");
         ocl::Kernel radixShuffle(radix_kernel, radix_kernel_length, "radixShuffle");
         radixInit.compile();
-        radixSum.compile();
+        radixFwd.compile();
+        radixMid.compile();
+        radixBwd.compile();
         radixShuffle.compile();
 
         const unsigned int workGroupSize = 128;
-        const unsigned int bitsPerPass = 2;
-        const unsigned int prefsumsSize = n * (1 << bitsPerPass);
-        gpu::gpu_mem_32u prefsums_gpu, prefsums_next_gpu, as_next_gpu;
+        const unsigned int bitsPerPass = 4;
+        const unsigned int prefsumsSize = ceil_pow_2(n * (1 << bitsPerPass));
+
+        gpu::gpu_mem_32u prefsums_gpu, as_next_gpu;
         prefsums_gpu.resizeN(prefsumsSize);
-        prefsums_next_gpu.resizeN(prefsumsSize);
         as_next_gpu.resizeN(n);
 
         //#define DEBUG
@@ -84,14 +98,20 @@ int main(int argc, char **argv)
             t.restart(); // Запускаем секундомер после прогрузки данных чтобы замерять время работы кернела, а не трансфер данных
 
             const unsigned int global_n_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-            const unsigned int global_prefsums_work_size = (prefsumsSize + workGroupSize - 1) / workGroupSize * workGroupSize;
             for (int bit = 0; bit < 32; bit += bitsPerPass) {
                 radixInit.exec(gpu::WorkSize(workGroupSize, global_n_work_size),
                                as_gpu, prefsums_gpu, n, bit);
-                for (int sumBlock = 1; sumBlock < prefsumsSize; sumBlock *= 2) {
-                    radixSum.exec(gpu::WorkSize(workGroupSize, global_prefsums_work_size),
-                                  prefsums_gpu, prefsums_next_gpu, prefsumsSize, sumBlock);
-                    prefsums_gpu.swap(prefsums_next_gpu);
+                int sumBlock = 1;
+                for (; sumBlock < prefsumsSize; sumBlock *= 2) {
+                    const unsigned int global_prefsums_work_size = (prefsumsSize / (2 * sumBlock) + workGroupSize - 1) / workGroupSize * workGroupSize;
+                    radixFwd.exec(gpu::WorkSize(workGroupSize, global_prefsums_work_size),
+                                  prefsums_gpu, prefsumsSize, sumBlock);
+                }
+                radixMid.exec(gpu::WorkSize(1, 1), prefsums_gpu, prefsumsSize);
+                for (sumBlock /= 2; sumBlock >= 1; sumBlock /= 2) {
+                    const unsigned int global_prefsums_work_size = (prefsumsSize / (2 * sumBlock) + workGroupSize - 1) / workGroupSize * workGroupSize;
+                    radixBwd.exec(gpu::WorkSize(workGroupSize, global_prefsums_work_size),
+                                  prefsums_gpu, prefsumsSize, sumBlock);
                 }
                 radixShuffle.exec(gpu::WorkSize(workGroupSize, global_n_work_size),
                                   as_gpu, as_next_gpu, prefsums_gpu, n, bit);
