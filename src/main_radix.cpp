@@ -132,9 +132,9 @@ int main(int argc, char **argv)
                     }
                     std::cout << "\n";
                 }
-                std::cout << "new bits:";
+                std::cout << "new vals:";
                 for (int i = 0; i < n; i++) {
-                    std::cout << " " << !!(as_next[i] & (1 << bit));
+                    std::cout << " " << ((as_next[i] >> bit) & ((1 << bitsPerPass) - 1));
                 }
                 std::cout << "\n";
                 return 0;
