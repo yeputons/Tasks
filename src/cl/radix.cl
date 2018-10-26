@@ -64,6 +64,37 @@ __kernel void radixBwd(__global int* prefsums, int size, int sumBlock) {
     }
 }
 
+__kernel void radixLocalBwd(__global int* global_prefsums) {
+    int local_i = get_local_id(0);
+    int global_i = 2 * (get_global_id(0) - local_i) + local_i;
+
+    __local int prefsums[LSIZE];
+    prefsums[local_i] = global_prefsums[global_i];
+    prefsums[local_i + WORK_GROUP_SIZE] = global_prefsums[global_i + WORK_GROUP_SIZE];
+
+    for (int sumBlock = LSIZE / 2; sumBlock >= 1; sumBlock /= 2) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+        int pos = 2 * sumBlock * (local_i + 1) - 1;
+
+        int beforeMe, leftChild;
+        if (pos < LSIZE) {
+            beforeMe = prefsums[pos];
+            leftChild = prefsums[pos - sumBlock];
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        if (pos < LSIZE) {
+            prefsums[pos - sumBlock] = beforeMe;
+            prefsums[pos] = beforeMe + leftChild;
+        }
+    }
+    barrier(CLK_GLOBAL_MEM_FENCE);
+
+    global_prefsums[global_i] = prefsums[local_i];
+    global_prefsums[global_i + WORK_GROUP_SIZE] = prefsums[local_i + WORK_GROUP_SIZE];
+}
+
 __kernel void radixShuffle(__global unsigned int* as, __global unsigned int *as_next, __global int* prefsums, int n, int bit) {
     int i = get_global_id(0);
     int pos;

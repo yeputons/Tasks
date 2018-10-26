@@ -73,12 +73,14 @@ int main(int argc, char **argv)
         ocl::Kernel radixFwd(radix_kernel, radix_kernel_length, "radixFwd");
         ocl::Kernel radixMid(radix_kernel, radix_kernel_length, "radixMid");
         ocl::Kernel radixBwd(radix_kernel, radix_kernel_length, "radixBwd");
+        ocl::Kernel radixLocalBwd(radix_kernel, radix_kernel_length, "radixLocalBwd");
         ocl::Kernel radixShuffle(radix_kernel, radix_kernel_length, "radixShuffle");
         radixInit.compile();
         radixLocalFwd.compile();
         radixFwd.compile();
         radixMid.compile();
         radixBwd.compile();
+        radixLocalBwd.compile();
         radixShuffle.compile();
 
         const unsigned int workGroupSize = 128;
@@ -116,10 +118,15 @@ int main(int argc, char **argv)
                                   prefsums_gpu, prefsumsSize, sumBlock);
                 }
                 radixMid.exec(gpu::WorkSize(1, 1), prefsums_gpu, prefsumsSize);
-                for (sumBlock /= 2; sumBlock >= 1; sumBlock /= 2) {
+                for (sumBlock /= 2; sumBlock >= 2 * workGroupSize; sumBlock /= 2) {
                     const unsigned int global_prefsums_work_size = (prefsumsSize / (2 * sumBlock) + workGroupSize - 1) / workGroupSize * workGroupSize;
                     radixBwd.exec(gpu::WorkSize(workGroupSize, global_prefsums_work_size),
                                   prefsums_gpu, prefsumsSize, sumBlock);
+                }
+                {
+                    const unsigned int global_prefsums_work_size = (prefsumsSize / 2 + workGroupSize - 1) / workGroupSize * workGroupSize;
+                    radixLocalBwd.exec(gpu::WorkSize(workGroupSize, global_prefsums_work_size),
+                                       prefsums_gpu);
                 }
                 radixShuffle.exec(gpu::WorkSize(workGroupSize, global_n_work_size),
                                   as_gpu, as_next_gpu, prefsums_gpu, n, bit);
