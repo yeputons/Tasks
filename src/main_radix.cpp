@@ -107,7 +107,7 @@ int main(int argc, char **argv)
                 {
                     const unsigned int global_prefsums_work_size = (prefsumsSize / 2 + workGroupSize - 1) / workGroupSize * workGroupSize;
                     radixLocalFwd.exec(gpu::WorkSize(workGroupSize, global_prefsums_work_size),
-                                       prefsums_gpu, prefsumsSize);
+                                       prefsums_gpu);
                 }
                 int sumBlock = 2 * workGroupSize;
                 for (; sumBlock < prefsumsSize; sumBlock *= 2) {

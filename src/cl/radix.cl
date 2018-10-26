@@ -14,7 +14,7 @@ __kernel void radixInit(__global unsigned int* as, __global int* prefsums, int n
     prefsums[n * val + i] = 1;
 }
 
-__kernel void radixLocalFwd(__global int* global_prefsums, int global_size) {
+__kernel void radixLocalFwd(__global int* global_prefsums) {
     int local_i = get_local_id(0);
     int global_i = 2 * (get_global_id(0) - local_i) + local_i;
 
