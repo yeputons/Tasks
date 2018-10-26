@@ -84,7 +84,7 @@ int main(int argc, char **argv)
         radixShuffle.compile();
 
         const unsigned int workGroupSize = 128;
-        const unsigned int bitsPerPass = 4;
+        const unsigned int bitsPerPass = 2;
         const unsigned int prefsumsSize = ceil_pow_2(std::max(2 * workGroupSize, n * (1 << bitsPerPass)));
 
         gpu::gpu_mem_32u prefsums_gpu, as_next_gpu;

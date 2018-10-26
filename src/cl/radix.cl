@@ -1,5 +1,5 @@
 #define WORK_GROUP_SIZE 128
-#define BITS_PER_PASS 4
+#define BITS_PER_PASS 2
 #define BITS_MSK ((1 << BITS_PER_PASS) - 1)
 #define LSIZE (2 * WORK_GROUP_SIZE)
 
