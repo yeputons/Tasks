@@ -33,9 +33,7 @@ int main(int argc, char **argv)
     context.activate();
 
     int benchmarkingIters = 10;
-    // We want to check that bound checks in kernel are correct,
-    // hence n should not be divisible by powers of two as much as possible.
-    unsigned int n = 5*1000*1000+37;
+    unsigned int n = 32 * 1024 * 1024;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
