@@ -75,10 +75,10 @@ int main(int argc, char **argv)
                               as_gpu, n);
             for (int sortedBlockSize = 1; sortedBlockSize < n; sortedBlockSize *= 2) {
                 bitonic.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                             as_gpu, n, sortedBlockSize, false);
+                             as_gpu, n, sortedBlockSize, 0);
                 for (int alignBlock = sortedBlockSize / 2; alignBlock > 0; alignBlock /= 2) {
                     bitonic.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                                 as_gpu, n, alignBlock, true);
+                                 as_gpu, n, alignBlock, 1);
                 }
             }
             t.nextLap();

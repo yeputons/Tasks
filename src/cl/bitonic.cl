@@ -13,7 +13,7 @@ void bitonicCalc(int n, int halfBlockSize, bool directPass, int i, int *a, int *
         : blockStart + blockSize - 1 - inBlockId;
 }
 
-__kernel void bitonic(__global float* as, int n, int halfBlockSize, bool directPass)
+__kernel void bitonic(__global float* as, int n, int halfBlockSize, int directPass)
 {
     int a, b;
     bitonicCalc(n, halfBlockSize, directPass, get_global_id(0), &a, &b);
