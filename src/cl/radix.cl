@@ -29,7 +29,7 @@ __kernel void radixLocalFwd(__global int* global_prefsums) {
             prefsums[pos] += prefsums[pos - sumBlock];
         }
     }
-    barrier(CLK_GLOBAL_MEM_FENCE);
+    barrier(CLK_LOCAL_MEM_FENCE);
 
     global_prefsums[global_i] = prefsums[local_i];
     global_prefsums[global_i + WORK_GROUP_SIZE] = prefsums[local_i + WORK_GROUP_SIZE];
@@ -49,19 +49,12 @@ __kernel void radixMid(__global int* prefsums, int size) {
 
 __kernel void radixBwd(__global int* prefsums, int size, int sumBlock) {
     int i = 2 * sumBlock * (get_global_id(0) + 1) - 1;
+    if (i >= size) return;
 
-    int beforeMe, leftChild;
-    if (i < size) {
-        beforeMe = prefsums[i];
-        leftChild = prefsums[i - sumBlock];
-    }
-
-    barrier(CLK_GLOBAL_MEM_FENCE);
-
-    if (i < size) {
-        prefsums[i - sumBlock] = beforeMe;
-        prefsums[i] = beforeMe + leftChild;
-    }
+    int beforeMe = prefsums[i];
+    int leftChild = prefsums[i - sumBlock];
+    prefsums[i - sumBlock] = beforeMe;
+    prefsums[i] = beforeMe + leftChild;
 }
 
 __kernel void radixLocalBwd(__global int* global_prefsums) {
@@ -89,7 +82,7 @@ __kernel void radixLocalBwd(__global int* global_prefsums) {
             prefsums[pos] = beforeMe + leftChild;
         }
     }
-    barrier(CLK_GLOBAL_MEM_FENCE);
+    barrier(CLK_LOCAL_MEM_FENCE);
 
     global_prefsums[global_i] = prefsums[local_i];
     global_prefsums[global_i + WORK_GROUP_SIZE] = prefsums[local_i + WORK_GROUP_SIZE];
@@ -97,16 +90,9 @@ __kernel void radixLocalBwd(__global int* global_prefsums) {
 
 __kernel void radixShuffle(__global unsigned int* as, __global unsigned int *as_next, __global int* prefsums, int n, int bit) {
     int i = get_global_id(0);
-    int pos;
+    if (i >= n) return;
 
-    if (i < n) {
-        int val = (as[i] >> bit) & BITS_MSK;
-        pos = prefsums[val * n + i];
-    }
-
-    barrier(CLK_GLOBAL_MEM_FENCE);
-
-    if (i < n) {
-        as_next[pos] = as[i];
-    }
+    int val = (as[i] >> bit) & BITS_MSK;
+    int pos = prefsums[val * n + i];
+    as_next[pos] = as[i];
 }
