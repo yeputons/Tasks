@@ -12,6 +12,8 @@
 #define __local __shared__
 #define __constant __constant__
 
+typedef unsigned int uint;
+
 // https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/barrier.html
 enum	cl_mem_fence_flags
 {
@@ -81,10 +83,8 @@ STATIC_KEYWORD uint	get_work_dim()
 #define HOST_CODE
 #endif
 
-#ifdef HOST_CODE
 #include <libgpu/work_size.h>
 #include <libgpu/shared_device_buffer.h>
 #include <cuda_runtime_api.h>
-#endif
 
 #endif // pragma once
