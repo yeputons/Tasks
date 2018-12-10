@@ -1,5 +1,3 @@
-#pragma OPENCL EXTENSION cl_khr_int64_extended_atomics: enable
-
 __kernel void fill_zero(__global int *as) {
 	as[get_global_id(0)] = 0;
 }
