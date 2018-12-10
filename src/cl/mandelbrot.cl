@@ -7,12 +7,10 @@
 #define threshold 256.0f
 #define threshold2 (threshold * threshold)
 
-__kernel void mandelbrot(__global float *results, float fromX, float fromY, float sizeX, float sizeY, unsigned int iters, unsigned int smoothing)
+__kernel void mandelbrot(__global float *results, int width, int height, float fromX, float fromY, float sizeX, float sizeY, unsigned int iters, unsigned int smoothing)
 {
 	int i = get_global_id(0);
 	int j = get_global_id(1);
-	unsigned int width = get_global_size(0);
-	unsigned int height = get_global_size(1);
 
 	float x0 = fromX + (i + 0.5f) * sizeX / width;
 	float y0 = fromY + (j + 0.5f) * sizeY / height;

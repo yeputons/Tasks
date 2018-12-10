@@ -132,7 +132,7 @@ int main(int argc, char **argv)
 
 		timer t;
 		for (int i = 0; i < benchmarkingIters; ++i) {
-			kernel.exec(gpu::WorkSize(GROUP_SIZE, GROUP_SIZE, width, height), gpu_buffer, centralX - sizeX / 2.0f, centralY - sizeY / 2.0f, sizeX, sizeY, iterationsLimit, 0);
+			kernel.exec(gpu::WorkSize(GROUP_SIZE, GROUP_SIZE, width, height), gpu_buffer, width, height, centralX - sizeX / 2.0f, centralY - sizeY / 2.0f, sizeX, sizeY, iterationsLimit, 0);
 			t.nextLap();
 		}
 		gpu_buffer.readN(gpu_results.ptr(), width * height);
