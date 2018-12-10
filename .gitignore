@@ -10,3 +10,13 @@ cmake_install.cmake
 compile_commands.json
 libs/
 nbproject/
+
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.opensdf
+*.sdf
+Debug/
+/x64/
+/.vs
