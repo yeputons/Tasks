@@ -1,7 +1,10 @@
 #include <libutils/misc.h>
 #include <libutils/timer.h>
 #include <libutils/fast_random.h>
-
+#include "libgpu/context.h"
+#include "cl/max_prefix_sum_cl.h"
+#include "libgpu/shared_device_buffer.h"
+#include <algorithm>
 
 template<typename T>
 void raiseFail(const T &a, const T &b, std::string message, std::string filename, int line)
@@ -71,7 +74,55 @@ int main(int argc, char **argv)
         }
 
         {
-            // TODO: implement on OpenCL
-        }
+			gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+			gpu::Context context;
+			context.init(device.device_id_opencl);
+			context.activate();
+
+			ocl::Kernel fill_zero(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "fill_zero");
+			fill_zero.compile(/*printLog=*/ false);
+
+			ocl::Kernel prefix_sum(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum");
+			prefix_sum.compile(/*printLog=*/ false);
+
+			ocl::Kernel max_val(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "max_val");
+			max_val.compile(/*printLog=*/ false);
+
+			const int GROUP_SIZE = 256;
+			const int WORK_SIZE = (n + GROUP_SIZE - 1) / GROUP_SIZE * GROUP_SIZE;
+
+			gpu::shared_device_buffer_typed<cl_int> as_buffer, prefsum_buffer, max_id_buffer;
+			as_buffer.resizeN(WORK_SIZE);
+			fill_zero.exec(gpu::WorkSize(GROUP_SIZE,WORK_SIZE), as_buffer);
+			as_buffer.writeN(as.data(), n);
+			prefsum_buffer.resizeN(WORK_SIZE);
+			max_id_buffer.resizeN(WORK_SIZE);
+
+			timer t;
+			for (int iter = 0; iter < benchmarkingIters; ++iter) {
+				as_buffer.copyToN(prefsum_buffer, WORK_SIZE);
+				for (int step = 1; step < WORK_SIZE; step *= 2) {
+					prefix_sum.exec(gpu::WorkSize(GROUP_SIZE, std::max(GROUP_SIZE, WORK_SIZE / step / 2)), prefsum_buffer, WORK_SIZE, step);
+				}
+				for (int step = 1; step < WORK_SIZE; step *= 2)
+				{
+					max_val.exec(gpu::WorkSize(GROUP_SIZE, std::max(GROUP_SIZE, WORK_SIZE / step / 2)), prefsum_buffer, max_id_buffer, WORK_SIZE, step);
+				}
+
+				int max_sum, result;
+				prefsum_buffer.readN(&max_sum, 1);
+				max_id_buffer.readN(&result, 1);
+				if (max_sum <= 0)
+				{
+					max_sum = 0;
+					result = 0;
+				}
+				EXPECT_THE_SAME(reference_max_sum, max_sum, "GPU result should be consistent!");
+				EXPECT_THE_SAME(reference_result, result, "GPU result should be consistent!");
+				t.nextLap();
+			}
+			std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+			std::cout << "GPU: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+		}
     }
 }
