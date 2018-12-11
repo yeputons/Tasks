@@ -82,17 +82,26 @@ int main(int argc, char **argv)
 			ocl::Kernel fill_zero(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "fill_zero");
 			fill_zero.compile(/*printLog=*/ false);
 
+			ocl::Kernel fill_zero_i(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "fill_zero_i");
+			fill_zero_i.compile(/*printLog=*/ false);
+
+			ocl::Kernel prefix_sum_fwd_local(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_fwd_local");
+			prefix_sum_fwd_local.compile(/*printLog=*/ false);
+
 			ocl::Kernel prefix_sum_fwd(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_fwd");
 			prefix_sum_fwd.compile(/*printLog=*/ false);
 
 			ocl::Kernel prefix_sum_bwd(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_bwd");
 			prefix_sum_bwd.compile(/*printLog=*/ false);
 
+			ocl::Kernel prefix_sum_bwd_local(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_bwd_local");
+			prefix_sum_bwd_local.compile(/*printLog=*/ false);
+
 			ocl::Kernel max_val(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "max_val");
 			max_val.compile(/*printLog=*/ false);
 
 			const int GROUP_SIZE = 1024;
-			const int WORK_SIZE = (n + GROUP_SIZE - 1) / GROUP_SIZE * GROUP_SIZE;
+			const int WORK_SIZE = (n + 2 * GROUP_SIZE - 1) / (2 * GROUP_SIZE) * (2 * GROUP_SIZE);
 
 			gpu::shared_device_buffer_typed<cl_int> as_buffer, prefsum_buffer, max_id_buffer;
 			as_buffer.resizeN(WORK_SIZE);
@@ -104,14 +113,17 @@ int main(int argc, char **argv)
 			timer t;
 			for (int iter = 0; iter < benchmarkingIters; ++iter) {
 				as_buffer.copyToN(prefsum_buffer, WORK_SIZE);
-				for (int step = 1; step < WORK_SIZE; step *= 2) {
+				prefix_sum_fwd_local.exec(gpu::WorkSize(GROUP_SIZE, WORK_SIZE / 2), prefsum_buffer);
+				for (int step = 2 * GROUP_SIZE; step < WORK_SIZE; step *= 2) {
 					prefix_sum_fwd.exec(gpu::WorkSize(GROUP_SIZE, std::max(GROUP_SIZE, WORK_SIZE / step / 2)), prefsum_buffer, WORK_SIZE, step);
 				}
 				cl_int total_sum;
 				prefsum_buffer.readN(&total_sum, 1, WORK_SIZE - 1);
-				for (int step = WORK_SIZE / 2; step >= 1; step /= 2) {
+				fill_zero_i.exec(gpu::WorkSize(1, 1), prefsum_buffer, WORK_SIZE - 1);
+				for (int step = WORK_SIZE / 2; step >= 2 * GROUP_SIZE; step /= 2) {
 					prefix_sum_bwd.exec(gpu::WorkSize(GROUP_SIZE, std::max(GROUP_SIZE, WORK_SIZE / step / 2)), prefsum_buffer, WORK_SIZE, step);
 				}
+				prefix_sum_bwd_local.exec(gpu::WorkSize(GROUP_SIZE, WORK_SIZE / 2), prefsum_buffer);
 
 				for (int step = 1; step < WORK_SIZE; step *= 2)
 				{
