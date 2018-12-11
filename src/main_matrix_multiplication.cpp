@@ -9,6 +9,7 @@
 #include <vector>
 #include <iostream>
 #include <stdexcept>
+#include <cassert>
 
 
 int main(int argc, char **argv)
@@ -20,10 +21,10 @@ int main(int argc, char **argv)
     context.activate();
 
     int benchmarkingIters = 10; // TODO пока тестируетесь удобно выставить единицу
-    unsigned int M = 1024;
-    unsigned int K = 1024;
-    unsigned int N = 1024;
-    const size_t gflops = ((size_t) M * K * N * 2) / (1000 * 1000 * 1000); // умножить на два, т.к. операция сложения и умножения
+    const unsigned int M = 1024;
+    const unsigned int K = 1024;
+    const unsigned int N = 1024;
+    const float gflops = ((float) M * K * N * 2) / (1000 * 1000 * 1000); // умножить на два, т.к. операция сложения и умножения
 
     std::vector<float> as(M*K, 0);
     std::vector<float> bs(K*N, 0);
@@ -66,13 +67,16 @@ int main(int argc, char **argv)
     as_gpu.writeN(as.data(), M*K);
     bs_gpu.writeN(bs.data(), K*N);
 
-    ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "matrix_multiplication");
+    const int TILE_SIZE = 32;
+    ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "matrix_multiplication", "-DTILE_SIZE=" + to_string(TILE_SIZE));
     matrix_multiplication_kernel.compile();
+    assert(M % TILE_SIZE == 0);
+    assert(N % TILE_SIZE == 0);
+    assert(K % TILE_SIZE == 0);
 
     {
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            const int TILE_SIZE = 32;
             const int WORK_SIZE_M = (M + TILE_SIZE - 1) / TILE_SIZE * TILE_SIZE;
             const int WORK_SIZE_N = (N + TILE_SIZE - 1) / TILE_SIZE * TILE_SIZE;
             matrix_multiplication_kernel.exec(gpu::WorkSize(TILE_SIZE, TILE_SIZE, WORK_SIZE_M, WORK_SIZE_N), as_gpu, bs_gpu, cs_gpu, M, N, K);
