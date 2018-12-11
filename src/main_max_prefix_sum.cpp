@@ -82,13 +82,16 @@ int main(int argc, char **argv)
 			ocl::Kernel fill_zero(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "fill_zero");
 			fill_zero.compile(/*printLog=*/ false);
 
-			ocl::Kernel prefix_sum(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum");
-			prefix_sum.compile(/*printLog=*/ false);
+			ocl::Kernel prefix_sum_fwd(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_fwd");
+			prefix_sum_fwd.compile(/*printLog=*/ false);
+
+			ocl::Kernel prefix_sum_bwd(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_bwd");
+			prefix_sum_bwd.compile(/*printLog=*/ false);
 
 			ocl::Kernel max_val(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "max_val");
 			max_val.compile(/*printLog=*/ false);
 
-			const int GROUP_SIZE = 256;
+			const int GROUP_SIZE = 1024;
 			const int WORK_SIZE = (n + GROUP_SIZE - 1) / GROUP_SIZE * GROUP_SIZE;
 
 			gpu::shared_device_buffer_typed<cl_int> as_buffer, prefsum_buffer, max_id_buffer;
@@ -102,8 +105,14 @@ int main(int argc, char **argv)
 			for (int iter = 0; iter < benchmarkingIters; ++iter) {
 				as_buffer.copyToN(prefsum_buffer, WORK_SIZE);
 				for (int step = 1; step < WORK_SIZE; step *= 2) {
-					prefix_sum.exec(gpu::WorkSize(GROUP_SIZE, std::max(GROUP_SIZE, WORK_SIZE / step / 2)), prefsum_buffer, WORK_SIZE, step);
+					prefix_sum_fwd.exec(gpu::WorkSize(GROUP_SIZE, std::max(GROUP_SIZE, WORK_SIZE / step / 2)), prefsum_buffer, WORK_SIZE, step);
 				}
+				cl_int total_sum;
+				prefsum_buffer.readN(&total_sum, 1, WORK_SIZE - 1);
+				for (int step = WORK_SIZE / 2; step >= 1; step /= 2) {
+					prefix_sum_bwd.exec(gpu::WorkSize(GROUP_SIZE, std::max(GROUP_SIZE, WORK_SIZE / step / 2)), prefsum_buffer, WORK_SIZE, step);
+				}
+
 				for (int step = 1; step < WORK_SIZE; step *= 2)
 				{
 					max_val.exec(gpu::WorkSize(GROUP_SIZE, std::max(GROUP_SIZE, WORK_SIZE / step / 2)), prefsum_buffer, max_id_buffer, WORK_SIZE, step);
@@ -112,10 +121,10 @@ int main(int argc, char **argv)
 				int max_sum, result;
 				prefsum_buffer.readN(&max_sum, 1);
 				max_id_buffer.readN(&result, 1);
-				if (max_sum <= 0)
+				if (max_sum < total_sum)
 				{
-					max_sum = 0;
-					result = 0;
+					max_sum = total_sum;
+					result =  WORK_SIZE;
 				}
 				EXPECT_THE_SAME(reference_max_sum, max_sum, "GPU result should be consistent!");
 				EXPECT_THE_SAME(reference_result, result, "GPU result should be consistent!");
