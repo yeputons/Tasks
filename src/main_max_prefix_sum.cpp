@@ -20,7 +20,33 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 int main(int argc, char **argv)
 {
-    int benchmarkingIters = 10;
+	gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+	gpu::Context context;
+	context.init(device.device_id_opencl);
+	context.activate();
+
+	ocl::Kernel fill_zero(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "fill_zero");
+	fill_zero.compile(/*printLog=*/ false);
+
+	ocl::Kernel fill_zero_i(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "fill_zero_i");
+	fill_zero_i.compile(/*printLog=*/ false);
+
+	ocl::Kernel prefix_sum_fwd_local(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_fwd_local");
+	prefix_sum_fwd_local.compile(/*printLog=*/ false);
+
+	ocl::Kernel prefix_sum_fwd(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_fwd");
+	prefix_sum_fwd.compile(/*printLog=*/ false);
+
+	ocl::Kernel prefix_sum_bwd(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_bwd");
+	prefix_sum_bwd.compile(/*printLog=*/ false);
+
+	ocl::Kernel prefix_sum_bwd_local(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_bwd_local");
+	prefix_sum_bwd_local.compile(/*printLog=*/ false);
+
+	ocl::Kernel max_val(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "max_val");
+	max_val.compile(/*printLog=*/ false);
+
+	int benchmarkingIters = 10;
     int max_n = (1 << 24);
 
     for (int n = 2; n <= max_n; n *= 2) {
@@ -74,32 +100,6 @@ int main(int argc, char **argv)
         }
 
         {
-			gpu::Device device = gpu::chooseGPUDevice(argc, argv);
-			gpu::Context context;
-			context.init(device.device_id_opencl);
-			context.activate();
-
-			ocl::Kernel fill_zero(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "fill_zero");
-			fill_zero.compile(/*printLog=*/ false);
-
-			ocl::Kernel fill_zero_i(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "fill_zero_i");
-			fill_zero_i.compile(/*printLog=*/ false);
-
-			ocl::Kernel prefix_sum_fwd_local(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_fwd_local");
-			prefix_sum_fwd_local.compile(/*printLog=*/ false);
-
-			ocl::Kernel prefix_sum_fwd(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_fwd");
-			prefix_sum_fwd.compile(/*printLog=*/ false);
-
-			ocl::Kernel prefix_sum_bwd(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_bwd");
-			prefix_sum_bwd.compile(/*printLog=*/ false);
-
-			ocl::Kernel prefix_sum_bwd_local(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "prefix_sum_bwd_local");
-			prefix_sum_bwd_local.compile(/*printLog=*/ false);
-
-			ocl::Kernel max_val(max_prefix_sum_kernel, max_prefix_sum_kernel_length, "max_val");
-			max_val.compile(/*printLog=*/ false);
-
 			const int GROUP_SIZE = 1024;
 			const int WORK_SIZE = (n + 2 * GROUP_SIZE - 1) / (2 * GROUP_SIZE) * (2 * GROUP_SIZE);
 
