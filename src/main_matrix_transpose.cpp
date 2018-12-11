@@ -26,7 +26,7 @@ int main(int argc, char **argv)
     std::vector<float> as(M*K, 0);
     std::vector<float> as_t(M*K, 0);
 
-    FastRandom r(M+K);
+    FastRandom r(M + K);
     for (unsigned int i = 0; i < as.size(); ++i) {
         as[i] = r.nextf();
     }
@@ -38,22 +38,31 @@ int main(int argc, char **argv)
 
     as_gpu.writeN(as.data(), M*K);
 
-	const int GROUP_SIZE = 32;
-    ocl::Kernel matrix_transpose_kernel(matrix_transpose, matrix_transpose_length, "matrix_transpose", "-DGROUP_SIZE=" + to_string(GROUP_SIZE));
-    matrix_transpose_kernel.compile();
+    const int GROUP_SIZE = 32;
 
+    const auto measure = [&](ocl::Kernel &kernel)
     {
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             const int WORK_SIZE_M = (M + GROUP_SIZE - 1) / GROUP_SIZE * GROUP_SIZE;
             const int WORK_SIZE_K = (K + GROUP_SIZE - 1) / GROUP_SIZE * GROUP_SIZE;
-            matrix_transpose_kernel.exec(gpu::WorkSize(GROUP_SIZE, GROUP_SIZE, WORK_SIZE_M, WORK_SIZE_K), as_gpu, as_t_gpu, M, K);
+            kernel.exec(gpu::WorkSize(GROUP_SIZE, GROUP_SIZE, WORK_SIZE_M, WORK_SIZE_K), as_gpu, as_t_gpu, M, K);
             t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << M*K/1000.0/1000.0 / t.lapAvg() << " millions/s" << std::endl;
-    }
+        std::cout << "GPU: " << M * K / 1000.0 / 1000.0 / t.lapAvg() << " millions/s" << std::endl;
+    };
 
+    ocl::Kernel matrix_transpose_kernel_naive(matrix_transpose, matrix_transpose_length, "matrix_transpose", "-DNAIVE");
+    matrix_transpose_kernel_naive.compile();
+    ocl::Kernel matrix_transpose_kernel(matrix_transpose, matrix_transpose_length, "matrix_transpose", "-DGROUP_SIZE=" + to_string(GROUP_SIZE));
+    matrix_transpose_kernel.compile();
+
+    std::cout << "Naive:\n";
+    measure(matrix_transpose_kernel_naive);
+
+    std::cout << "Coalesced:\n";
+    measure(matrix_transpose_kernel);
     as_t_gpu.readN(as_t.data(), M*K);
 
     // Проверяем корректность результатов
