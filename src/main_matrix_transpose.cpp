@@ -57,12 +57,18 @@ int main(int argc, char **argv)
     matrix_transpose_kernel_naive.compile();
     ocl::Kernel matrix_transpose_kernel(matrix_transpose, matrix_transpose_length, "matrix_transpose", "-DGROUP_SIZE=" + to_string(GROUP_SIZE));
     matrix_transpose_kernel.compile();
+    ocl::Kernel matrix_transpose_kernel_nc(matrix_transpose, matrix_transpose_length, "matrix_transpose", "-DGROUP_SIZE=" + to_string(GROUP_SIZE) + " -DNON_COALESCED");
+    matrix_transpose_kernel_nc.compile();
 
     std::cout << "Naive:\n";
     measure(matrix_transpose_kernel_naive);
 
     std::cout << "Coalesced:\n";
     measure(matrix_transpose_kernel);
+
+    std::cout << "Non-coalesced:\n";
+    measure(matrix_transpose_kernel_nc);
+
     as_t_gpu.readN(as_t.data(), M*K);
 
     // Проверяем корректность результатов
